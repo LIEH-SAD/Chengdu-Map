@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>成都地铁线路图生成器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap');
+        
+        * {
+            font-family: 'Noto Sans SC', 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        /* 背景改白一点 */
+        .metro-bg {
+            background-color: #F5F5F5;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* 站点名称：不用粗体，线路颜色 */
+        .station-name {
+            font-size: 3.5rem;
+            font-weight: 400;
+            color: var(--line-color);
+            letter-spacing: 0.05em;
+            line-height: 1.2;
+        }
+        
+        .station-en {
+            font-size: 1.2rem;
+            color: var(--line-color);
+            font-weight: 400;
+            letter-spacing: 0.02em;
+            margin-top: 4px;
+        }
+        
+        /* 线路编号：线路颜色 */
+        .line-number-container {
+            display: inline-flex;
+            align-items: center;
+            border: 2px solid var(--line-color);
+            border-radius: 50px;
+            padding: 0 12px;
+            background: #fff;
+            z-index: 10;
+        }
+        
+        .line-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--line-color);
+        }
+        
+        .line-separator {
+            width: 2px;
+            height: 2.5rem;
+            background-color: var(--line-color);
+            margin: 0 8px;
+        }
+        
+        /* 进度条 */
+        .progress-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(to right, var(--line-color) 50%, #ccc 50%);
+            width: 100%;
+        }
+        
+        /* 方向文字：字体放大，加入英文，线路颜色 */
+        .direction-text {
+            font-size: 1.5rem;
+            color: var(--line-color);
+            font-weight: 400;
+            margin-bottom: 4px;
+        }
+        
+        .direction-en {
+            font-size: 1rem;
+            color: var(--line-color);
+            font-weight: 400;
+            margin-bottom: 8px;
+        }
+        
+        /* 下一站：字体放大，加入英文，完整箭头，线路颜色 */
+        .next-station {
+            font-size: 1.6rem;
+            color: var(--line-color);
+            font-weight: 400;
+        }
+        
+        .next-en {
+            font-size: 1rem;
+            color: var(--line-color);
+            font-weight: 400;
+            margin-top: 4px;
+        }
+        
+        .arrow-left {
+            font-size: 2.5rem;
+            color: var(--line-color);
+        }
+        
+        /* 指示灯：圆角改大 */
+        .indicator-light {
+            width: 80px;
+            height: 40px;
+            border-radius: 12px;
+            background: var(--indicator-color);
+            box-shadow: 0 0 15px var(--indicator-color), 0 0 30px var(--indicator-color);
+            animation: pulse 1.5s infinite alternate;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.7; box-shadow: 0 0 10px var(--indicator-color); }
+            100% { opacity: 1; box-shadow: 0 0 20px var(--indicator-color), 0 0 40px var(--indicator-color); }
+        }
+        
+        /* 终点站标签 */
+        .terminal-tag {
+            font-size: 1.5rem;
+            color: var(--line-color);
+            font-weight: 400;
+            border-left: 4px solid var(--line-color);
+            padding-left: 12px;
+        }
+        
+        .terminal-en {
+            font-size: 1rem;
+            color: var(--line-color);
+            font-weight: 400;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto p-6">
+        <h1 class="text-3xl font-bold mb-6 text-center">成都地铁线路图生成器</h1>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 配置面板 -->
+            <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow">
+                <h2 class="text-xl font-semibold mb-4">配置参数</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">站点名称</label>
+                        <input type="text" id="stationName" value="天府机场北" class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">英文名称</label>
+                        <input type="text" id="stationEn" value="Tianfu International Airport North" class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">线路颜色</label>
+                        <div class="flex gap-2">
+                            <input type="color" id="lineColor" value="#0091D5" class="w-12 h-10">
+                            <select id="presetColor" class="flex-1 px-3 py-2 border rounded-md">
+                                <option value="">自定义</option>
+                                <option value="#0066CC">1号线</option>
+                                <option value="#009944">2号线</option>
+                                <option value="#FF6600">4号线</option>
+                                <option value="#996633">6号线</option>
+                                <option value="#0091D5" selected>18号线</option>
+                                <option value="#A0429F">19号线</option>
+                                <option value="#FFC800">蓉2号线</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">线路编号 (左|右)</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="lineNumLeft" value="18" class="w-1/2 px-3 py-2 border rounded-md">
+                            <input type="text" id="lineNumRight" value="17" class="w-1/2 px-3 py-2 border rounded-md">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">行驶方向</label>
+                        <input type="text" id="direction" value="火车南站方向" class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">方向英文</label>
+                        <input type="text" id="directionEn" value="To South Railway Station" class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">站点类型</label>
+                        <select id="stationType" class="w-full px-3 py-2 border rounded-md">
+                            <option value="normal">普通站</option>
+                            <option value="terminal">终点站</option>
+                        </select>
+                    </div>
+                    
+                    <div id="nextStationContainer">
+                        <label class="block text-sm font-medium mb-1">下一站名称</label>
+                        <input type="text" id="nextStation" value="天府机场1号2号航站楼" class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                    
+                    <div id="nextEnContainer">
+                        <label class="block text-sm font-medium mb-1">下一站英文</label>
+                        <input type="text" id="nextEn" value="Terminal 1 & 2 of Tianfu International Airport" class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">指示灯颜色</label>
+                        <input type="color" id="indicatorColor" value="#FF8C00" class="w-full h-10">
+                    </div>
+                    
+                    <button id="updateBtn" class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition">
+                        更新预览
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 预览区域 -->
+            <div class="lg:col-span-2">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h2 class="text-xl font-semibold mb-4">线路图预览</h2>
+                    
+                    <!-- 核心预览区 -->
+                    <div id="metroPreview" class="metro-bg p-8 rounded-lg" style="--line-color: #0091D5; --indicator-color: #FF8C00;">
+                        <!-- 站点名称：居中，非粗体，线路颜色 -->
+                        <div class="w-full flex flex-col items-center mb-8">
+                            <div class="station-name" id="stationNameDisplay">天府机场北</div>
+                            <div class="station-en" id="stationEnDisplay">Tianfu International Airport North</div>
+                        </div>
+
+                        <!-- 方向文字：放大，加英文，线路颜色 -->
+                        <div class="direction-text" id="directionDisplay">火车南站方向</div>
+                        <div class="direction-en" id="directionEnDisplay">To South Railway Station</div>
+
+                        <!-- 进度条区域 -->
+                        <div class="w-full relative mb-8">
+                            <div class="w-full progress-bar" id="progressBar"></div>
+                            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 line-number-container">
+                                <span class="line-number" id="lineNumLeftDisplay">18</span>
+                                <div class="line-separator"></div>
+                                <span class="line-number" id="lineNumRightDisplay">17</span>
+                            </div>
+                        </div>
+
+                        <!-- 底部区域 -->
+                        <div class="flex items-center w-full">
+                            <div id="bottomLeftContainer" class="w-1/3">
+                                <div class="flex items-start gap-3">
+                                    <i class="fa fa-long-arrow-left arrow-left"></i>
+                                    <div>
+                                        <div class="next-station" id="nextStationDisplay">下一站 天府机场1号2号航站楼</div>
+                                        <div class="next-en" id="nextEnDisplay">Terminal 1 & 2 of Tianfu International Airport</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- 指示灯：大圆角 -->
+                            <div class="w-1/3 flex justify-center">
+                                <div class="indicator-light" id="indicatorLight"></div>
+                            </div>
+                            <div class="w-1/3"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('presetColor').addEventListener('change', function() {
+                if (this.value) {
+                    document.getElementById('lineColor').value = this.value;
+                }
+            });
+            
+            document.getElementById('stationType').addEventListener('change', function() {
+                const nextContainer = document.getElementById('nextStationContainer');
+                const nextEnContainer = document.getElementById('nextEnContainer');
+                if (this.value === 'terminal') {
+                    nextContainer.style.display = 'none';
+                    nextEnContainer.style.display = 'none';
+                } else {
+                    nextContainer.style.display = 'block';
+                    nextEnContainer.style.display = 'block';
+                }
+            });
+            
+            document.getElementById('updateBtn').addEventListener('click', updatePreview);
+            updatePreview();
+        });
+        
+        function updatePreview() {
+            const stationName = document.getElementById('stationName').value;
+            const stationEn = document.getElementById('stationEn').value;
+            const lineColor = document.getElementById('lineColor').value;
+            const lineNumLeft = document.getElementById('lineNumLeft').value;
+            const lineNumRight = document.getElementById('lineNumRight').value;
+            const direction = document.getElementById('direction').value;
+            const directionEn = document.getElementById('directionEn').value;
+            const stationType = document.getElementById('stationType').value;
+            const nextStation = document.getElementById('nextStation').value;
+            const nextEn = document.getElementById('nextEn').value;
+            const indicatorColor = document.getElementById('indicatorColor').value;
+            
+            const preview = document.getElementById('metroPreview');
+            preview.style.setProperty('--line-color', lineColor);
+            preview.style.setProperty('--indicator-color', indicatorColor);
+            
+            document.getElementById('stationNameDisplay').textContent = stationName;
+            document.getElementById('stationEnDisplay').textContent = stationEn;
+            document.getElementById('lineNumLeftDisplay').textContent = lineNumLeft;
+            document.getElementById('lineNumRightDisplay').textContent = lineNumRight;
+            document.getElementById('directionDisplay').textContent = direction;
+            document.getElementById('directionEnDisplay').textContent = directionEn;
+            
+            const bottomLeftContainer = document.getElementById('bottomLeftContainer');
+            if (stationType === 'terminal') {
+                bottomLeftContainer.innerHTML = `
+                    <div class="terminal-tag" style="--line-color: ${lineColor};">
+                        终点站<br>
+                        <span class="terminal-en">The Terminal Station</span>
+                    </div>
+                `;
+            } else {
+                bottomLeftContainer.innerHTML = `
+                    <div class="flex items-start gap-3">
+                        <i class="fa fa-long-arrow-left arrow-left" style="--line-color: ${lineColor};"></i>
+                        <div>
+                            <div class="next-station" style="color: ${lineColor};">下一站 ${nextStation}</div>
+                            <div class="next-en" style="color: ${lineColor};">${nextEn}</div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
